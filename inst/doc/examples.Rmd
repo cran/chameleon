@@ -1,0 +1,166 @@
+---
+title: Coloring multidimensional data
+author: Oren Ben-Kiki
+date: 2021-06-17
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Coloring multidimensional data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>")
+```
+
+## The Problem
+
+Suppose we have some data containing multiple variable values (measurements) for a number of
+elements (observations). We'd like to visualize this data, and when doing so, assign different
+colors to different elements.
+
+This requires us to manually assign a color to each element, or if the data lends itself to it,
+compute some linear score for each element and use that as an index into a color palette. For large
+multidimensional data, neither approach is practical.
+
+The \code{chameleon} package provides a quick-and-dirty solution which automatically computes a
+distinct color to each data element, where these colors try to reflect the "coarse" structure of the
+data; that is, "more similar" data elements are assigned "more similar" colors.
+
+## Seatbelts Example
+
+We'll demonstrate this on the seatbelt data, one of the built-in data sets provided by R. To begin,
+we'll load the \code{chameleon} package and access the seatbelts data. Since the package only works
+on simple matrices, we'll have to convert the seatbelts time series data to a simple matrix:
+
+```{r}
+library(chameleon)
+seatbelts <- matrix(as.numeric(Seatbelts), nrow=nrow(Seatbelts), ncol=ncol(Seatbelts))
+colnames(seatbelts) <- colnames(Seatbelts)
+dim(seatbelts)
+head(seatbelts, 4)
+```
+
+We now have a matrix with 192 elements and 8 measurements for each one. Using the \code{data_colors}
+function, we can assign a color to each element and use it to visualize the data, for example using
+a 2D UMAP projection:
+
+```{r, fig.show='hold'}
+colors <- data_colors(seatbelts)
+
+library(umap)
+layout <- umap(seatbelts, min_dist=0.99, random_state=123456)$layout
+
+plot(layout, asp=1, col=colors, pch=19, cex=1)
+```
+
+Assuming that UMAP has indeed captured some underlying structure of the data, we can see that the
+chosen colors correspond well to this structure, and possibly hint at some additional structure not
+captured well in the 2D projection.
+
+However, 192 colors is "a bit much", so we can't expect them to be very distinct from each other. We
+can reduce the number of colors by grouping the data elements.
+
+For example, since the original seatbelts data is a time series, we can compute for each row the
+year it applies to:
+
+```{r}
+years <- floor(time(Seatbelts))
+unique(years)
+```
+
+And then compute and show a color for each year:
+
+```{r, fig.show='hold'}
+year_colors <- data_colors(seatbelts, group=years)
+
+plot(layout, asp=1, col=year_colors[as.character(years)], pch=19, cex=1)
+legend('bottomleft', legend=names(year_colors), col=year_colors, lty=1, lwd=3, cex=0.75)
+```
+
+We see each year's data is spread over a large part of the projection, but not uniformly so,
+suggesting that while there is some year-to-year variation, it probably isn't the right way to group
+this data into distinct clusters.
+
+## PBMC Example
+
+For a more successful grouping example, we'll use some single-cell RNA sequence (sc-RNA) data
+(provided as part of the \code{chameleon} package). This data contains a \code{umis} matrix,
+containing ~1.5K metacells (rows), and for each one, the UMI count (# of detected RNA molecules) for
+each of ~600 different "feature" genes (columns). In addition, it provides a vector of cell
+\code{types} which were assigned to the metacells using a supervised analysis pipeline, and a
+\code{umap} 2-column matrix containing the 2D UMAP projection chosen to visualize the data (a common
+practice for scRNA data analysis).
+
+
+```{r}
+data(pbmc)
+```
+
+Let's compute a color for each cell type. For better results, we first convert the raw UMI counts to
+a log of the fraction of of the total UMIs in each metacell:
+
+```{r}
+fractions <- pbmc$umis / rowSums(pbmc$umis)
+log_fractions <- log2(fractions + 1e-5)
+type_colors <- data_colors(log_fractions, group=pbmc$types)
+```
+
+We can then use this to color the provided 2D UMAP projection. Here we'll use \code{ggplot2}:
+
+```{r, fig.show='hold'}
+library(ggplot2)
+frame <- as.data.frame(pbmc$umap)
+frame$type <- pbmc$types
+ggplot(frame, aes(x=xs, y=ys, color=type)) +
+    geom_point(size=0.75) +
+    scale_color_manual(values=type_colors) +
+    theme_light() +
+    guides(color=guide_legend(override.aes=list(size=3))) +
+    theme(legend.text=element_text(size=12), legend.key.height=unit(14, 'pt'))
+```
+
+Here we see that, in contrast to the seatbelt years case above, each type (group of metacells) maps
+to a distinct region in the 2D UMAP projection, suggesting that grouping the metacells by the type
+annotations does capture some significant structure of the data.
+
+## Picking distinct colors
+
+The \code{chameleon} package also provides the lower-lever function \code{distinct_colors} which
+attempts to select a number of distinct colors, which can be directly assigned to unordered
+categorical data. For example:
+
+```{r}
+distinct_colors(8)
+```
+
+By default, this excludes low-saturation colors (with a low \code{hypot(a, b)} value in the CIELAB
+color space), as well as too-dark and too-light colors (with too-low or too-high \code{l} value in
+the CIELAB color space). This can be controlled by specifying explicit \code{minimal_saturation},
+\code{minimal_lightness} and \code{maximal_lightness} parameters.
+
+The \code{scale_color_chameleon} convenience function wraps this to allow it to be used this as a
+\code{ggplot2} color scale for unordered (categorical) data. For example:
+
+```{r, fig.show='hold'}
+ggplot(frame, aes(x=xs, y=ys, color=type)) +
+    geom_point(size=0.75) +
+    scale_color_chameleon() +
+    theme_light() +
+    guides(color=guide_legend(override.aes=list(size=3))) +
+    theme(legend.text=element_text(size=12), legend.key.height=unit(14, 'pt'))
+```
+
+And the similar \code{scale_fill_chameleon} function allows it to be used for \code{ggplot2} fill
+colors:
+
+```{r, fig.show='hold'}
+ggplot(frame, aes(x=xs, y=ys, fill=type)) +
+    geom_point(shape=21, size=2, stroke=0.2, color="black") +
+    scale_fill_chameleon() +
+    theme_light() +
+    theme(legend.text=element_text(size=12), legend.key.height=unit(14, 'pt'))
+```
+
+Using any of these functions arbitrarily maps the colors to the values, making no attempt to have
+similar colors reflect similarities in the underlying data.
