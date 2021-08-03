@@ -1,6 +1,6 @@
 Package: chameleon
-Version: 0.1-0
-Date: 2021-07-05
+Version: 0.2-0
+Date: 2021-08-03
 Title: Automatic Colors for Multi-Dimensional Data
 Description: Assign distinct colors to arbitrary multi-dimensional data, considering its structure.
 Authors@R: c(
@@ -16,9 +16,9 @@ LazyData: true
 Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2021-07-05 17:01:34 UTC; obk
+Packaged: 2021-08-03 08:24:58 UTC; obk
 Author: Oren Ben-Kiki [aut, cre],
   Weizmann Institute of Science [cph]
 Maintainer: Oren Ben-Kiki <oren@ben-kiki.org>
 Repository: CRAN
-Date/Publication: 2021-07-06 08:50:02 UTC
+Date/Publication: 2021-08-03 08:40:02 UTC
