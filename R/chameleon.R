@@ -45,20 +45,20 @@ data_colors <- function(data, run_umap=TRUE, groups=NULL,
         return (c())
     }
 
-    if (nrow(data) == 1) {
-        return (c("#FFFFFF"))
-    }
-
-    if (nrow(data) == 2) {
-        return (c("#E69F00", "#0072B2"))
-    }
-
     if (run_umap) {
         data <- umap::umap(data, n_components=3)$layout
     }
 
     if (!is.null(groups)) {
         data <- group_centers(data, groups)
+    }
+
+    if (nrow(data) == 1) {
+        return (c("#FFFFFF"))
+    }
+
+    if (nrow(data) == 2) {
+        return (c("#E69F00", "#0072B2"))
     }
 
     colors <- distinct_colors(nrow(data), minimal_saturation, minimal_lightness, maximal_lightness)
