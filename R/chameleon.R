@@ -54,22 +54,23 @@ data_colors <- function(data, run_umap=TRUE, groups=NULL,
     }
 
     if (nrow(data) == 1) {
-        return (c("#FFFFFF"))
+        result <- c("#FFFFFF")
+
+    } else if (nrow(data) == 2) {
+        result <- c("#E69F00", "#0072B2")
+
+    } else {
+        colors <- distinct_colors(nrow(data), minimal_saturation, minimal_lightness, maximal_lightness)
+
+        data_points <- normalized_data(stats::prcomp(data, retx=TRUE)$x)
+        color_points <- normalized_data(stats::prcomp(colors$lab, retx=TRUE)$x)
+
+        distances <- data_distances(data_points, color_points)
+        closest_colors <- clue::solve_LSAP(distances)[1:nrow(data)]
+
+        result <- colors$name[closest_colors]
     }
 
-    if (nrow(data) == 2) {
-        return (c("#E69F00", "#0072B2"))
-    }
-
-    colors <- distinct_colors(nrow(data), minimal_saturation, minimal_lightness, maximal_lightness)
-
-    data_points <- normalized_data(stats::prcomp(data, retx=TRUE)$x)
-    color_points <- normalized_data(stats::prcomp(colors$lab, retx=TRUE)$x)
-
-    distances <- data_distances(data_points, color_points)
-    closest_colors <- clue::solve_LSAP(distances)[1:nrow(data)]
-
-    result <- colors$name[closest_colors]
     names(result) <- rownames(data)
     return (result)
 }
